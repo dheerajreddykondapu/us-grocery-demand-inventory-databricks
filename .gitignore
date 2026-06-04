@@ -1,0 +1,21 @@
+# Secrets
+.env
+*.pem
+kaggle.json
+config/secrets.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Databricks / local
+.DS_Store
+.ipynb_checkpoints/
+
+# Large data files
+*.csv
+*.zip
+*.parquet
+*.delta

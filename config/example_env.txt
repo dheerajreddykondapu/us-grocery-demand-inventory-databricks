@@ -1,0 +1,4 @@
+S3_BUCKET_NAME=retail-demand-intelligence-project
+KAGGLE_USERNAME=your_kaggle_username
+KAGGLE_KEY=your_kaggle_api_key
+KAGGLE_DATASET_SLUG=yasserh/instacart-online-grocery-basket-analysis-dataset
