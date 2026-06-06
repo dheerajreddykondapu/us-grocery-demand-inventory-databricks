@@ -1,13 +1,6 @@
 name: CD - Deploy Grocery Databricks Bundle Free Tier Serverless
 
 on:
-  push:
-    branches: ["main"]
-    paths:
-      - "notebooks/**"
-      - "sql/**"
-      - "databricks.yml"
-      - ".github/workflows/deploy-databricks-bundle.yml"
   workflow_dispatch:
     inputs:
       run_job:

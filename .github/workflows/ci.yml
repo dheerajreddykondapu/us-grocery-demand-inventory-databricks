@@ -30,12 +30,32 @@ jobs:
 
       - name: Check required project files exist
         run: |
-          test -f lambda/lambda_function.py
-          test -f requirements.txt
-          test -f sql/dashboard_queries.sql
-          test -f databricks.yml
-          test -f notebooks/00_validate_s3_access.py
-          test -f notebooks/12_gold_basket_affinity.py
+          required_files=(
+            "lambda/lambda_function.py"
+            "requirements.txt"
+            "sql/dashboard_queries.sql"
+            "databricks.yml"
+            "notebooks/00_setup.py"
+            "notebooks/01_validate_s3_raw_files.py"
+            "notebooks/02_bronze_instacart_ingestion.py"
+            "notebooks/03_silver_dimensions.py"
+            "notebooks/04_silver_product_ai_classification.py"
+            "notebooks/05_silver_fact_order_products.py"
+            "notebooks/06_gold_demand_metrics.py"
+            "notebooks/07_gold_reorder_metrics.py"
+            "notebooks/08_generate_inventory_snapshots.py"
+            "notebooks/09_gold_stockout_risk.py"
+            "notebooks/10_gold_overstock_alerts.py"
+            "notebooks/11_gold_basket_affinity.py"
+            "notebooks/12_final_validation.py"
+          )
+
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "Missing required file: $file"
+              exit 1
+            fi
+          done
 
       - name: Print validated pipeline assets
         run: |

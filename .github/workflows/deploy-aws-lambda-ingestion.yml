@@ -1,13 +1,6 @@
 name: CD - Deploy Grocery AWS Lambda Ingestion
 
 on:
-  push:
-    branches: ["main"]
-    paths:
-      - "lambda/**"
-      - "requirements.txt"
-      - "config/**"
-      - ".github/workflows/deploy-aws-lambda-ingestion.yml"
   workflow_dispatch:
     inputs:
       run_ingestion:
@@ -47,12 +40,16 @@ jobs:
 
       - name: Package Lambda source
         run: |
-          rm -f /tmp/${LAMBDA_FUNCTION_NAME}.zip
-          (cd lambda && zip -qr /tmp/${LAMBDA_FUNCTION_NAME}.zip .)
+          rm -f "/tmp/${LAMBDA_FUNCTION_NAME}.zip"
+          (cd lambda && zip -qr "/tmp/${LAMBDA_FUNCTION_NAME}.zip" .)
 
       - name: Update Lambda function code
         run: |
-          aws lambda update-function-code             --function-name "${LAMBDA_FUNCTION_NAME}"             --zip-file "fileb:///tmp/${LAMBDA_FUNCTION_NAME}.zip"             --query 'FunctionArn'             --output text >/dev/null
+          aws lambda update-function-code \
+            --function-name "${LAMBDA_FUNCTION_NAME}" \
+            --zip-file "fileb:///tmp/${LAMBDA_FUNCTION_NAME}.zip" \
+            --query 'FunctionArn' \
+            --output text >/dev/null
           aws lambda wait function-updated --function-name "${LAMBDA_FUNCTION_NAME}"
 
       - name: Update Lambda environment variables safely
@@ -60,11 +57,19 @@ jobs:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
         run: |
-          aws lambda update-function-configuration             --function-name "${LAMBDA_FUNCTION_NAME}"             --environment "Variables={S3_BUCKET_NAME=${S3_BUCKET_NAME},KAGGLE_USERNAME=${KAGGLE_USERNAME},KAGGLE_KEY=${KAGGLE_KEY},KAGGLE_DATASET_SLUG=${KAGGLE_DATASET_SLUG}}"             --query 'FunctionArn'             --output text >/dev/null
+          aws lambda update-function-configuration \
+            --function-name "${LAMBDA_FUNCTION_NAME}" \
+            --environment "Variables={S3_BUCKET_NAME=${S3_BUCKET_NAME},KAGGLE_USERNAME=${KAGGLE_USERNAME},KAGGLE_KEY=${KAGGLE_KEY},KAGGLE_DATASET_SLUG=${KAGGLE_DATASET_SLUG}}" \
+            --query 'FunctionArn' \
+            --output text >/dev/null
           aws lambda wait function-updated --function-name "${LAMBDA_FUNCTION_NAME}"
 
       - name: Invoke Lambda ingestion manually
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_ingestion == true }}
         run: |
-          aws lambda invoke             --function-name "${LAMBDA_FUNCTION_NAME}"             --cli-binary-format raw-in-base64-out             --payload '{"source":"github-actions","action":"ingest_instacart_raw_data"}'             /tmp/lambda-response.json >/dev/null
+          aws lambda invoke \
+            --function-name "${LAMBDA_FUNCTION_NAME}" \
+            --cli-binary-format raw-in-base64-out \
+            --payload '{"source":"github-actions","action":"ingest_instacart_raw_data"}' \
+            /tmp/lambda-response.json >/dev/null
           cat /tmp/lambda-response.json
