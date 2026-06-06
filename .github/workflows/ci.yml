@@ -1,0 +1,43 @@
+name: CI - Validate Grocery Databricks Pipeline
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Lambda, notebooks, SQL, and bundle config
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile Python files
+        run: |
+          python -m compileall lambda notebooks
+
+      - name: Check required project files exist
+        run: |
+          test -f lambda/lambda_function.py
+          test -f requirements.txt
+          test -f sql/dashboard_queries.sql
+          test -f databricks.yml
+          test -f notebooks/00_validate_s3_access.py
+          test -f notebooks/12_gold_basket_affinity.py
+
+      - name: Print validated pipeline assets
+        run: |
+          echo "Validated assets:"
+          find lambda notebooks sql config -type f | sort

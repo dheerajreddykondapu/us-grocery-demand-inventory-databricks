@@ -1,0 +1,70 @@
+name: CD - Deploy Grocery AWS Lambda Ingestion
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "lambda/**"
+      - "requirements.txt"
+      - "config/**"
+      - ".github/workflows/deploy-aws-lambda-ingestion.yml"
+  workflow_dispatch:
+    inputs:
+      run_ingestion:
+        description: "Invoke Lambda after deployment to pull Kaggle data into S3?"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: grocery-lambda-deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-2' }}
+  LAMBDA_FUNCTION_NAME: ${{ vars.LAMBDA_FUNCTION_NAME || 'instacart-raw-ingestion-lambda' }}
+  S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME || 'retail-demand-intelligence-project' }}
+  KAGGLE_DATASET_SLUG: ${{ vars.KAGGLE_DATASET_SLUG || 'yasserh/instacart-online-grocery-basket-analysis-dataset' }}
+
+jobs:
+  deploy:
+    name: Deploy Kaggle-to-S3 Lambda
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Package Lambda source
+        run: |
+          rm -f /tmp/${LAMBDA_FUNCTION_NAME}.zip
+          (cd lambda && zip -qr /tmp/${LAMBDA_FUNCTION_NAME}.zip .)
+
+      - name: Update Lambda function code
+        run: |
+          aws lambda update-function-code             --function-name "${LAMBDA_FUNCTION_NAME}"             --zip-file "fileb:///tmp/${LAMBDA_FUNCTION_NAME}.zip"             --query 'FunctionArn'             --output text >/dev/null
+          aws lambda wait function-updated --function-name "${LAMBDA_FUNCTION_NAME}"
+
+      - name: Update Lambda environment variables safely
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        run: |
+          aws lambda update-function-configuration             --function-name "${LAMBDA_FUNCTION_NAME}"             --environment "Variables={S3_BUCKET_NAME=${S3_BUCKET_NAME},KAGGLE_USERNAME=${KAGGLE_USERNAME},KAGGLE_KEY=${KAGGLE_KEY},KAGGLE_DATASET_SLUG=${KAGGLE_DATASET_SLUG}}"             --query 'FunctionArn'             --output text >/dev/null
+          aws lambda wait function-updated --function-name "${LAMBDA_FUNCTION_NAME}"
+
+      - name: Invoke Lambda ingestion manually
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_ingestion == true }}
+        run: |
+          aws lambda invoke             --function-name "${LAMBDA_FUNCTION_NAME}"             --cli-binary-format raw-in-base64-out             --payload '{"source":"github-actions","action":"ingest_instacart_raw_data"}'             /tmp/lambda-response.json >/dev/null
+          cat /tmp/lambda-response.json

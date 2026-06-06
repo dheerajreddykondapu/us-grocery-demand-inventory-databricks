@@ -1,0 +1,50 @@
+name: CD - Deploy Grocery Databricks Bundle Free Tier Serverless
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "notebooks/**"
+      - "sql/**"
+      - "databricks.yml"
+      - ".github/workflows/deploy-databricks-bundle.yml"
+  workflow_dispatch:
+    inputs:
+      run_job:
+        description: "Run Databricks job after bundle deployment?"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grocery-databricks-deploy
+  cancel-in-progress: false
+
+env:
+  DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+  DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+jobs:
+  validate-and-deploy:
+    name: Validate and deploy Databricks serverless job
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Validate Databricks bundle
+        run: databricks bundle validate --target dev
+
+      - name: Deploy Databricks bundle
+        run: databricks bundle deploy --target dev
+
+      - name: Run Databricks job manually
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_job == true }}
+        run: databricks bundle run grocery_demand_inventory_pipeline --target dev
