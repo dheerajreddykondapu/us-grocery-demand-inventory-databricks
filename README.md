@@ -168,6 +168,158 @@ The Databricks SQL dashboard includes:
 - Overstock exposure by tier
 - Top basket product pairs
 
-## Resume Bullet
+## CI/CD Workflow Guide
 
-Built an on-demand AWS and Databricks ELT pipeline using Lambda, S3, Databricks Jobs, PySpark, Delta Lake, and Databricks AI Functions to process 33M+ Instacart order-product records across Bronze, Silver, and Gold layers for demand trends, reorder behavior, inventory risk, overstock exposure, basket affinity, and AI-enriched product segmentation.
+This project includes GitHub Actions workflow YAMLs under `.github/workflows/` to make the pipeline repeatable, validated, and deployment-ready. Instead of only documenting manual run steps, the workflows automate code validation, Lambda deployment, Databricks job deployment, and controlled pipeline execution.
+
+### Workflow Files
+
+| Workflow                          | Purpose                                                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`                          | Validates the repository structure, Python files, notebooks, SQL assets, and Databricks bundle configuration. |
+| `deploy-aws-lambda-ingestion.yml` | Deploys the AWS Lambda ingestion function and optionally invokes it to load raw data into S3.                 |
+| `deploy-databricks-bundle.yml`    | Validates and deploys the Databricks Asset Bundle, then optionally runs the Databricks workflow.              |
+
+### Pipeline Flow
+
+The pipeline follows an ingestion, curation, and consumption pattern:
+
+```text
+Kaggle Dataset
+ → AWS Lambda ingestion
+ → Amazon S3 raw landing zone
+ → Databricks serverless workflow
+ → Bronze Delta tables
+ → Silver cleaned and standardized tables
+ → Gold KPI and reporting tables
+ → Databricks SQL / dashboard consumption
+```
+
+### CI/CD Flow
+
+The CI/CD workflow follows this deployment pattern:
+
+```text
+Git push
+ → GitHub Actions CI validation
+ → Lambda deployment
+ → Optional Lambda ingestion run
+ → Databricks bundle validation
+ → Databricks job deployment
+ → Optional Bronze/Silver/Gold pipeline run
+```
+
+### Required GitHub Secrets
+
+Add these under:
+
+```text
+GitHub Repo → Settings → Secrets and variables → Actions → Secrets
+```
+
+```text
+DATABRICKS_HOST
+DATABRICKS_TOKEN
+AWS_ROLE_TO_ASSUME
+KAGGLE_USERNAME
+KAGGLE_KEY
+```
+
+### Required GitHub Variables
+
+Add these under:
+
+```text
+GitHub Repo → Settings → Secrets and variables → Actions → Variables
+```
+
+```text
+AWS_REGION=us-east-2
+LAMBDA_FUNCTION_NAME=instacart-raw-ingestion-lambda
+S3_BUCKET_NAME=retail-demand-intelligence-project
+KAGGLE_DATASET_SLUG=yasserh/instacart-online-grocery-basket-analysis-dataset
+```
+
+This project uses Databricks Free Edition/serverless compute, so no classic `DATABRICKS_CLUSTER_ID` is required.
+
+### How to Run
+
+#### 1. Run CI Validation
+
+CI runs automatically when code is pushed to the `main` branch.
+
+To check it manually:
+
+```text
+GitHub Repo → Actions → CI - Validate Grocery Databricks Pipeline
+```
+
+This validates project files only. It does not run AWS or Databricks jobs.
+
+#### 2. Deploy AWS Lambda
+
+Go to:
+
+```text
+GitHub Repo → Actions → CD - Deploy Grocery AWS Lambda Ingestion → Run workflow
+```
+
+Use:
+
+```text
+Invoke Lambda after deployment = unchecked
+```
+
+This deploys or updates the Lambda code without running ingestion.
+
+#### 3. Run Lambda Ingestion
+
+Run the same workflow again, but select:
+
+```text
+Invoke Lambda after deployment = checked
+```
+
+This invokes Lambda and loads the Kaggle grocery dataset into the S3 raw landing zone.
+
+#### 4. Deploy Databricks Bundle
+
+Go to:
+
+```text
+GitHub Repo → Actions → CD - Deploy Grocery Databricks Bundle → Run workflow
+```
+
+Use:
+
+```text
+Run Databricks job after deployment = unchecked
+```
+
+This validates and deploys the Databricks workflow without running the full pipeline.
+
+#### 5. Run Databricks Pipeline
+
+Run the same workflow again, but select:
+
+```text
+Run Databricks job after deployment = checked
+```
+
+This executes the Databricks workflow:
+
+```text
+Setup
+ → S3 raw validation
+ → Bronze ingestion
+ → Silver transformations
+ → Gold KPI tables
+ → Final validation
+```
+
+### Why This Workflow Design Is Used
+
+This project separates deployment from execution. Lambda and Databricks jobs can be deployed safely without automatically running the full pipeline. Manual workflow inputs control when ingestion and transformation jobs run, which helps avoid accidental cloud usage and keeps the project cost-safe for a free-tier/portfolio setup.
+
+The workflow YAMLs demonstrate production-style SDLC and CI/CD practices, including validation, deployment configuration, secret management, controlled execution, and repeatable pipeline operations.
+
